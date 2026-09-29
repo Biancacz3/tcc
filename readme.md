@@ -10,6 +10,7 @@ com captura pela Raspberry Pi e análise no computador.
 - Banco de dados: PostgreSQL 17.
 - Comunicação com o banco: SQLAlchemy 2 e Psycopg 3.
 - Migrações: Alembic.
+- Validação dos dados da API: Pydantic.
 
 As versões das bibliotecas estão em backend/requirements.txt.
 
@@ -36,6 +37,9 @@ Verificação da conexão com o banco:
 http://localhost:8000/api/v1/health/db
 
 Documentação interativa: http://localhost:8000/docs
+
+Após alterar o código do back-end, execute novamente o comando
+de inicialização com --build para reconstruir a imagem.
 
 Para consultar os registros da API:
 
@@ -65,6 +69,56 @@ A migração 0001_devices cria a tabela devices, com:
 - created_at: data e hora de criação.
 
 Mudanças futuras na estrutura terão novos arquivos de migração.
+
+## Dispositivos
+
+As rotas ficam em backend/app/api/devices.py.
+
+Os esquemas de entrada e saída ficam em
+backend/app/schemas/device.py.
+
+Cada requisição utiliza uma sessão própria do SQLAlchemy,
+fechada ao terminar.
+
+### Cadastrar
+
+POST /api/v1/devices
+
+Corpo de exemplo:
+
+`{"name": "Raspberry 01"}`
+
+O nome deve ter entre 1 e 100 caracteres após a remoção
+de espaços no início e no fim. Campos extras são rejeitados.
+
+O cadastro retorna HTTP 201 com id, name, is_active e created_at.
+O dispositivo é criado como ativo.
+
+Nomes podem se repetir. Cada cadastro recebe um UUID próprio.
+
+Dados inválidos retornam HTTP 422.
+
+### Listar
+
+GET /api/v1/devices
+
+A resposta é uma lista de dispositivos, ordenada por
+data de criação e identificador.
+
+Parâmetros opcionais:
+
+- limit: quantidade de registros, de 1 a 100. Padrão: 50.
+- offset: quantidade de registros a pular. Padrão: 0.
+
+Exemplo:
+http://localhost:8000/api/v1/devices?limit=50&offset=0
+
+### Acesso nesta etapa
+
+A API está publicada somente em 127.0.0.1:8000.
+
+A autenticação dos dispositivos será implementada antes
+do envio de imagens pela rede.
 
 ## Teste de disponibilidade do banco
 
@@ -98,7 +152,9 @@ de exemplo. A transferência dos dados exigirá backup e restauração.
 - PostgreSQL configurado com volume persistente.
 - Conexão entre API e PostgreSQL usando SQLAlchemy.
 - Verificação da comunicação com o banco.
-- Alembic configurado e primeira migração criada.
+- Alembic configurado e primeira migração aplicada.
 - Estrutura da tabela devices criada.
+- Cadastro e listagem de dispositivos pela API.
+- Validação do nome do dispositivo.
 - Script inicial da Raspberry em raspberry/capture_and_send.py.
-- Cadastro de dispositivos, capturas, interface e IA em desenvolvimento.
+- Autenticação, capturas, interface e IA em desenvolvimento.
