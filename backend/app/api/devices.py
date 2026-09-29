@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_session
 from app.models.device import Device
 from app.schemas.device import DeviceCreate, DeviceRead
+from app.security import require_admin
 
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/devices",
     tags=["Dispositivos"],
+    dependencies=[Depends(require_admin)],
 )
 
 DatabaseSession = Annotated[Session, Depends(get_session)]

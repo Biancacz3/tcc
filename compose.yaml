@@ -10,6 +10,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB no arquivo .env}
       POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Defina ADMIN_API_TOKEN no arquivo .env}
     depends_on:
       db:
         condition: service_healthy

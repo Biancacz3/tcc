@@ -18,8 +18,21 @@ As versões das bibliotecas estão em backend/requirements.txt.
 
 Na primeira configuração, crie .env a partir de .env.example.
 
-No .env, substitua a senha de exemplo por uma senha exclusiva
-para o banco local. Mantenha .env fora do Git.
+No .env, configure:
+
+- POSTGRES_DB: nome do banco.
+- POSTGRES_USER: usuário do banco.
+- POSTGRES_PASSWORD: senha exclusiva para o banco local.
+- ADMIN_API_TOKEN: chave administrativa desta instalação.
+
+Para gerar a chave administrativa, execute no computador:
+
+`python -c "import secrets; print(secrets.token_urlsafe(32))"`
+
+Copie o resultado para ADMIN_API_TOKEN no arquivo .env.
+
+Mantenha .env fora do Git. O arquivo .env.example contém
+somente valores de exemplo.
 
 ## Executar
 
@@ -48,6 +61,31 @@ Para consultar os registros da API:
 Para parar os serviços:
 
 `docker compose stop`
+
+## Autenticação administrativa
+
+As rotas de cadastro e listagem de dispositivos exigem
+a chave definida em ADMIN_API_TOKEN.
+
+A chave é enviada no cabeçalho HTTP:
+
+`Authorization: Bearer SUA_CHAVE_ADMINISTRATIVA`
+
+Na documentação interativa:
+
+1. Clique em Authorize.
+2. No campo AdminToken, cole somente a chave.
+3. Clique em Authorize e feche a janela.
+4. Execute as operações de dispositivos.
+
+Uma chave ausente ou incorreta retorna HTTP 401.
+
+Abrir a rota diretamente na barra do navegador não utiliza
+a autorização configurada no Swagger.
+
+A chave administrativa permite gerenciar os dispositivos.
+A credencial própria da Raspberry será implementada
+para o envio de imagens.
 
 ## Migrações
 
@@ -84,6 +122,8 @@ fechada ao terminar.
 
 POST /api/v1/devices
 
+Exige autenticação administrativa.
+
 Corpo de exemplo:
 
 `{"name": "Raspberry 01"}`
@@ -96,11 +136,13 @@ O dispositivo é criado como ativo.
 
 Nomes podem se repetir. Cada cadastro recebe um UUID próprio.
 
-Dados inválidos retornam HTTP 422.
+Com autenticação válida, dados inválidos retornam HTTP 422.
 
 ### Listar
 
 GET /api/v1/devices
+
+Exige autenticação administrativa.
 
 A resposta é uma lista de dispositivos, ordenada por
 data de criação e identificador.
@@ -110,15 +152,17 @@ Parâmetros opcionais:
 - limit: quantidade de registros, de 1 a 100. Padrão: 50.
 - offset: quantidade de registros a pular. Padrão: 0.
 
-Exemplo:
-http://localhost:8000/api/v1/devices?limit=50&offset=0
+Exemplo de caminho:
 
-### Acesso nesta etapa
+`/api/v1/devices?limit=50&offset=0`
 
-A API está publicada somente em 127.0.0.1:8000.
+## Testes da autenticação
 
-A autenticação dos dispositivos será implementada antes
-do envio de imagens pela rede.
+- GET de dispositivos sem chave: HTTP 401.
+- POST de dispositivos sem chave: HTTP 401.
+- GET de dispositivos com chave incorreta: HTTP 401.
+- GET de dispositivos com chave correta: HTTP 200.
+- POST com chave correta e nome vazio: HTTP 422.
 
 ## Teste de disponibilidade do banco
 
@@ -139,11 +183,15 @@ Após iniciar o banco, a rota deve voltar a indicar connected.
 
 ## Dados locais
 
+A API está publicada somente em 127.0.0.1:8000.
+
 O PostgreSQL utiliza o volume postgres_data.
 
 Os dados permanecem no computador em que o banco está executando.
 O GitHub sincroniza o código, as migrações e as configurações
 de exemplo. A transferência dos dados exigirá backup e restauração.
+
+Cada instalação configura suas credenciais no próprio .env.
 
 ## Progresso
 
@@ -156,5 +204,6 @@ de exemplo. A transferência dos dados exigirá backup e restauração.
 - Estrutura da tabela devices criada.
 - Cadastro e listagem de dispositivos pela API.
 - Validação do nome do dispositivo.
+- Proteção das rotas de dispositivos com chave administrativa.
 - Script inicial da Raspberry em raspberry/capture_and_send.py.
-- Autenticação, capturas, interface e IA em desenvolvimento.
+- Credenciais da Raspberry, capturas, interface e IA em desenvolvimento.
