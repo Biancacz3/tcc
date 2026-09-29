@@ -1,0 +1,26 @@
+# Configuracoes locais
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Front-end
+node_modules/
+dist/
+
+# Imagens, dados e modelos locais
+/data/
+/storage/
+/artifacts/models/
+pending/
+
+# Arquivos temporarios
+*.log
+Thumbs.db
+.DS_Store
