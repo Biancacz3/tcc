@@ -4,6 +4,15 @@ services:
       context: ./backend
     ports:
       - "127.0.0.1:8000:8000"
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB no arquivo .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:17
