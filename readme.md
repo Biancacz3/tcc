@@ -230,3 +230,4 @@ separadamente e fora do Git. O banco contém apenas seus hashes.
 - Identificação de dispositivo por sua credencial.
 - Script inicial da Raspberry em raspberry/capture_and_send.py.
 - Recebimento de imagens, interface e IA em desenvolvimento.
+Captura de imagens: [configuracao e testes](docs/capturas.md).

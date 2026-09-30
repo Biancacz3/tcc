@@ -11,6 +11,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Defina ADMIN_API_TOKEN no arquivo .env}
+      STORAGE_DIR: /app/storage
+    volumes:
+      - ./storage:/app/storage
     depends_on:
       db:
         condition: service_healthy
