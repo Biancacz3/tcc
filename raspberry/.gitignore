@@ -1,0 +1,5 @@
+pending/
+staging/
+rejected/
+.agent.lock
+.env.raspberry

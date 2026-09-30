@@ -1,0 +1,17 @@
+[Unit]
+Description=Captura e envio de fotos do TCC
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=bianca
+WorkingDirectory=/home/bianca/tcc-raspberry
+ExecStart=/usr/bin/python3 -u /home/bianca/tcc-raspberry/capture_and_send.py
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=60
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
