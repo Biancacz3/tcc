@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>Acelga · Monitoramento</title>
+  <link rel="stylesheet" href="/painel/styles.css?v=1">
+  <script src="/painel/app.js?v=1" defer></script>
+</head>
+<body>
+  <div id="login-view" class="login-layout">
+    <section class="welcome">
+      <div class="brand"><span class="brand-icon" aria-hidden="true">↗</span> acelga<span class="brand-dot">.</span></div>
+      <div class="welcome-copy"><p class="eyebrow">OBSERVAR PARA ENTENDER</p><h1>Um olhar mais<br>próximo da sua<br><em>plantação.</em></h1><p>Acompanhe as imagens das suas câmeras em um só lugar.</p></div>
+      <div class="welcome-footer"><span class="live-dot"></span> Monitoramento por imagem · Projeto TCC</div>
+    </section>
+    <main class="login-main">
+      <form id="login-form" class="login-form">
+        <span class="section-label">ACESSO AO PAINEL</span><h2>Bem-vinda ao campo.</h2><p>Entre para acompanhar suas capturas.</p>
+        <label for="admin-key">Chave administrativa</label>
+        <input id="admin-key" type="password" required autocomplete="off" spellcheck="false" placeholder="Cole sua chave de acesso">
+        <p class="field-hint">Use o valor de ADMIN_API_TOKEN do arquivo .env do computador.</p>
+        <button id="login-button" class="primary" type="submit">Entrar no painel <span aria-hidden="true">→</span></button>
+        <p id="login-error" class="error" role="alert"></p>
+        <p class="privacy-note">A chave fica apenas na memória desta página. Ao sair ou recarregar, você precisará entrar novamente.</p>
+      </form>
+    </main>
+  </div>
+  <div id="dashboard" class="app-layout" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-icon" aria-hidden="true">↗</span> acelga<span class="brand-dot">.</span></div>
+      <p class="sidebar-label">ACOMPANHAMENTO</p>
+      <div class="nav-active"><span aria-hidden="true">▦</span> Capturas</div>
+      <div class="sidebar-note"><span class="live-dot"></span><strong>Do campo para a tela</strong><p>Fotos enviadas pelas suas câmeras e armazenadas no computador.</p></div>
+      <button id="logout" class="logout" type="button">Sair do painel <span aria-hidden="true">↗</span></button>
+    </aside>
+    <main class="workspace">
+      <header class="topbar"><span>MONITORAMENTO DE ACELGA</span><span class="admin-badge">Acesso administrativo</span></header>
+      <section class="page-heading"><div><p class="section-label">SEU CAMPO, MAIS PERTO</p><h1>Galeria de capturas</h1><p>Observe os detalhes. Acompanhe cada registro.</p></div><button id="refresh" class="primary" type="button">↻ Atualizar</button></section>
+      <div class="notice"><span class="notice-icon" aria-hidden="true">i</span><p><strong>Acompanhamento por imagens.</strong> A análise por inteligência artificial ainda não está disponível. Estas fotos não representam um diagnóstico de pragas.</p></div>
+      <section class="stats" aria-label="Resumo da página">
+        <article><span>Capturas nesta página</span><strong id="stat-count">—</strong><small>Até 12 imagens por página</small></article>
+        <article><span>Dispositivos nesta página</span><strong id="stat-devices">—</strong><small>Câmeras que enviaram estas fotos</small></article>
+        <article><span>Recebimento mais recente da página</span><strong id="stat-received" class="date-stat">—</strong><small id="stat-received-date">Horário deste navegador</small></article>
+      </section>
+      <section class="gallery-section" aria-label="Imagens capturadas">
+        <div class="gallery-toolbar"><div><h2>Registros do campo</h2><p id="updated" aria-live="polite">Aguardando carregamento</p></div><label class="auto-label"><input id="auto-refresh" type="checkbox" checked> Atualizar a cada 30 s</label></div>
+        <p id="page-error" class="error page-error" role="alert" hidden></p>
+        <div id="empty-state" class="empty-state" hidden><span aria-hidden="true">▧</span><h3>Nenhuma captura por aqui</h3><p>As imagens aparecerão quando uma câmera enviar fotos ao sistema.</p></div>
+        <div id="gallery" class="gallery" aria-busy="false"></div>
+        <footer class="pagination"><span id="page-number">Página 1</span><div><button id="previous" class="secondary" type="button" disabled>← Anterior</button><button id="next" class="secondary" type="button" disabled>Próxima →</button></div></footer>
+        <p class="footnote">Ordenação pelo recebimento, das mais recentes às mais antigas. Os horários seguem o fuso deste navegador.</p>
+      </section>
+    </main>
+  </div>
+  <dialog id="image-dialog" aria-labelledby="detail-title">
+    <div class="dialog-top"><div><p class="section-label">DETALHES DA CAPTURA</p><h2 id="detail-title">Imagem capturada</h2></div><button id="close-dialog" class="secondary" type="button" aria-label="Fechar imagem">Fechar ×</button></div>
+    <div class="detail-image-wrap"><img id="detail-image" alt="Captura ampliada da câmera"></div>
+    <dl id="detail-fields"></dl>
+    <p class="detail-note">Imagem original · Sem análise por IA</p>
+  </dialog>
+</body>
+</html>

@@ -1,6 +1,9 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -18,6 +21,17 @@ app = FastAPI(
 
 app.include_router(devices_router, prefix="/api/v1")
 app.include_router(captures_router, prefix="/api/v1")
+
+app.mount(
+    "/painel",
+    StaticFiles(directory=Path(__file__).resolve().parent / "web", html=True),
+    name="painel",
+)
+
+
+@app.get("/", include_in_schema=False)
+def home() -> RedirectResponse:
+    return RedirectResponse("/painel/")
 
 
 @app.get("/api/v1/health", tags=["Sistema"])
