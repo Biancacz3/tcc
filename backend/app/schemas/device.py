@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -24,3 +25,9 @@ class DeviceRead(BaseModel):
     name: str
     is_active: bool
     created_at: datetime
+
+
+class DeviceTokenRead(BaseModel):
+    device_id: UUID
+    token: str
+    token_type: Literal["bearer"] = "bearer"
