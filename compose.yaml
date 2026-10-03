@@ -4,7 +4,6 @@ services:
       context: ./backend
     ports:
       - "127.0.0.1:8000:8000"
-      - "${API_LAN_IP:?Defina API_LAN_IP no arquivo .env}:8000:8000"
     environment:
       DB_HOST: db
       DB_PORT: "5432"
