@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.captures import router as captures_router
+from app.api.analyses import router as analyses_router
 from app.api.devices import router as devices_router
 from app.db.engine import engine
 
@@ -21,6 +22,7 @@ app = FastAPI(
 
 app.include_router(devices_router, prefix="/api/v1")
 app.include_router(captures_router, prefix="/api/v1")
+app.include_router(analyses_router, prefix="/api/v1")
 
 app.mount(
     "/painel",

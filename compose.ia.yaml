@@ -1,0 +1,5 @@
+# Usar junto de compose.yaml. Preserva as portas e configuracoes da sua maquina.
+services:
+  api:
+    volumes:
+      - ./artifacts/models:/app/models:ro

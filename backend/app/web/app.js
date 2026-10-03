@@ -4,6 +4,7 @@
   const PAGE_SIZE = 12;
   let key = "", generation = 0, offset = 0, busy = false, hasNext = false;
   let devices = new Map(), records = [], imageUrls = new Map();
+  let detailGeneration = 0, selectedRecord = null, selectedAnalysis = null, history = [];
   const requests = new Set();
   const dateTime = new Intl.DateTimeFormat("pt-BR", {dateStyle: "short", timeStyle: "medium"});
   const clock = new Intl.DateTimeFormat("pt-BR", {timeStyle: "medium"});
@@ -19,23 +20,28 @@
     return node;
   }
   class ApiError extends Error {
-    constructor(status) {
+    constructor(status, detail) {
       super(status === 401 || status === 403 ? "Chave ausente, inválida ou sem permissão. Entre com a chave administrativa." :
         status === 503 ? "O serviço está temporariamente indisponível. Confira a API, o banco e o armazenamento." :
         `Não foi possível concluir a solicitação (HTTP ${status}).`);
       this.status = status;
+      if (typeof detail === "string" && status !== 401 && status !== 403) this.message = detail;
     }
   }
-  async function api(path, type = "json") {
+  async function api(path, type = "json", method = "GET") {
     const controller = new AbortController();
     requests.add(controller);
-    const timeout = setTimeout(() => controller.abort(), type === "blob" ? 30000 : 15000);
+    const timeout = setTimeout(() => controller.abort(), method === "POST" ? 120000 : type === "blob" ? 30000 : 15000);
     try {
       const response = await fetch(`/api/v1${path}`, {
+        method,
         headers: {Authorization: `Bearer ${key}`},
         cache: "no-store", credentials: "omit", redirect: "error", signal: controller.signal
       });
-      if (!response.ok) throw new ApiError(response.status);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new ApiError(response.status, body.detail);
+      }
       if (type === "blob") {
         if (!(response.headers.get("content-type") || "").startsWith("image/jpeg")) {
           throw new Error("O servidor não retornou uma imagem JPEG.");
@@ -53,6 +59,7 @@
     return "Não foi possível comunicar com o sistema. Confira se o Docker e a API estão ligados e tente atualizar.";
   }
   function endSession(reason = "") {
+    resetAnalysis();
     generation++;
     key = ""; busy = false; offset = 0; hasNext = false; records = []; devices.clear();
     for (const request of requests) request.abort();
@@ -80,6 +87,8 @@
   function showDetails(record) {
     const url = imageUrls.get(record.id);
     if (!url) return;
+    resetAnalysis();
+    selectedRecord = record;
     $("detail-title").textContent = deviceName(record.device_id);
     $("detail-image").src = url;
     $("detail-image").alt = `Captura de ${deviceName(record.device_id)}, ${format(record.captured_at)}`;
@@ -91,7 +100,117 @@
     ];
     $("detail-fields").replaceChildren(...fields.flatMap(([label, value]) => [element("dt", "", label), element("dd", "", value)]));
     $("image-dialog").showModal();
+    loadAnalyses(record, detailGeneration);
   }
+  function resetAnalysis() {
+    detailGeneration++;
+    selectedRecord = null; selectedAnalysis = null; history = [];
+    $("analysis-canvas").hidden = true;
+    $("analysis-canvas").width = 1; $("analysis-canvas").height = 1;
+    $("detail-image").hidden = false;
+    $("analysis-message").textContent = "Consultando análises salvas…";
+    $("analysis-error").textContent = "";
+    $("analysis-meta").textContent = "";
+    $("analysis-detections").replaceChildren();
+    $("analysis-history").replaceChildren();
+    $("history-label").hidden = true;
+    $("analyze-button").disabled = true;
+    $("analyze-button").textContent = "Analisar com IA";
+    $("show-boxes").checked = true;
+    $("show-boxes").disabled = true;
+  }
+  function drawAnalysis() {
+    const img = $("detail-image"), canvas = $("analysis-canvas");
+    const show = selectedAnalysis && $("show-boxes").checked;
+    if (!show || !img.complete || !img.naturalWidth) {
+      canvas.hidden = true; img.hidden = false; return;
+    }
+    if (selectedAnalysis.width !== img.naturalWidth || selectedAnalysis.height !== img.naturalHeight) {
+      $("analysis-error").textContent = "As dimensões do resultado não correspondem à fotografia.";
+      canvas.hidden = true; img.hidden = false; return;
+    }
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    const fontSize = Math.max(14, Math.round(canvas.width / 65));
+    ctx.font = `600 ${fontSize}px sans-serif`;
+    ctx.lineWidth = Math.max(2, canvas.width / 350);
+    for (const detection of selectedAnalysis.detections) {
+      const [x1,y1,x2,y2] = detection.xyxy;
+      const label = `Possível pulgão · ${Math.round(detection.confidence * 100)}%`;
+      ctx.strokeStyle = "#c8fa67";
+      ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+      const tw = Math.min(canvas.width, ctx.measureText(label).width + 12);
+      const tx = Math.min(x1, canvas.width-tw), ty = Math.max(0, y1-fontSize-9);
+      ctx.fillStyle = "#193e30"; ctx.fillRect(tx, ty, tw, fontSize+9);
+      ctx.fillStyle = "#ffffff"; ctx.fillText(label, tx+6, ty+fontSize+1);
+    }
+    canvas.hidden = false; img.hidden = true;
+  }
+  function renderAnalysis(result) {
+    selectedAnalysis = result;
+    $("show-boxes").disabled = !result;
+    $("analysis-detections").replaceChildren();
+    if (!result) {
+      $("analysis-message").textContent = "Esta fotografia ainda não foi analisada.";
+      $("analysis-meta").textContent = "";
+    } else {
+      $("analysis-message").textContent = result.detection_count
+        ? (result.detection_count === 1 ? "1 possível pulgão detectado. Confira a marcação." : `${result.detection_count} possíveis pulgões detectados. Confira as marcações.`)
+        : "Nenhum pulgão detectado neste limiar. Isso não confirma ausência de pragas.";
+      $("analysis-meta").textContent = `${result.model_name} · modelo ${result.model_sha256.slice(0,12)} · limiar ${Math.round(result.confidence_threshold*100)}% · ${format(result.created_at)} · ${(result.processing_ms/1000).toLocaleString("pt-BR", {maximumFractionDigits: 2})} s`;
+      $("analysis-detections").append(...result.detections.map((d, i) =>
+        element("li", "", `${i+1}. Possível pulgão — pontuação ${(d.confidence*100).toLocaleString("pt-BR", {maximumFractionDigits: 1})}%`)));
+    }
+    drawAnalysis();
+  }
+  function renderHistory() {
+    $("analysis-history").replaceChildren(...history.map((item, index) => {
+      const option = element("option", "", `${format(item.created_at)} · ${item.model_name} · ${item.detection_count} detecção(ões)`);
+      option.value = String(index); return option;
+    }));
+    $("history-label").hidden = history.length < 2;
+    renderAnalysis(history[0] || null);
+  }
+  async function loadAnalyses(record, run) {
+    try {
+      const result = await api(`/captures/${record.id}/analyses`);
+      if (run !== detailGeneration) return;
+      history = result; renderHistory();
+    } catch (error) {
+      if (run !== detailGeneration) return;
+      if (error.status === 401 || error.status === 403) { endSession(error.message); return; }
+      $("analysis-message").textContent = "Não foi possível consultar as análises anteriores.";
+      $("analysis-error").textContent = message(error);
+    } finally {
+      if (run === detailGeneration) $("analyze-button").disabled = false;
+    }
+  }
+  $("analyze-button").addEventListener("click", async () => {
+    if (!selectedRecord) return;
+    const run = detailGeneration, record = selectedRecord;
+    $("analyze-button").disabled = true;
+    $("analyze-button").textContent = "Analisando…";
+    $("analysis-error").textContent = "";
+    try {
+      const result = await api(`/captures/${record.id}/analyses`, "json", "POST");
+      if (run !== detailGeneration) return;
+      history = [result, ...history.filter(item => item.id !== result.id)];
+      renderHistory();
+    } catch (error) {
+      if (run !== detailGeneration) return;
+      if (error.status === 401 || error.status === 403) { endSession(error.message); return; }
+      $("analysis-error").textContent = message(error);
+    } finally {
+      if (run === detailGeneration) {
+        $("analyze-button").disabled = false;
+        $("analyze-button").textContent = "Analisar com IA";
+      }
+    }
+  });
+  $("analysis-history").addEventListener("change", () => renderAnalysis(history[Number($("analysis-history").value)]));
+  $("show-boxes").addEventListener("change", drawAnalysis);
+  $("detail-image").addEventListener("load", drawAnalysis);
   function card(record) {
     const button = element("button", "capture-card");
     button.type = "button";
@@ -206,7 +325,7 @@
   $("previous").addEventListener("click", () => loadPage(Math.max(0, offset - PAGE_SIZE)));
   $("next").addEventListener("click", () => loadPage(offset + PAGE_SIZE));
   $("close-dialog").addEventListener("click", () => $("image-dialog").close());
-  $("image-dialog").addEventListener("close", () => $("detail-image").removeAttribute("src"));
+  $("image-dialog").addEventListener("close", () => { resetAnalysis(); $("detail-image").removeAttribute("src"); });
   setInterval(() => {
     if (key && !busy && offset === 0 && $("auto-refresh").checked && !document.hidden && !$("image-dialog").open) loadPage(0);
   }, 30000);

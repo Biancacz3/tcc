@@ -6,8 +6,8 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>Acelga · Monitoramento</title>
-  <link rel="stylesheet" href="/painel/styles.css?v=1">
-  <script src="/painel/app.js?v=1" defer></script>
+  <link rel="stylesheet" href="/painel/styles.css?v=2">
+  <script src="/painel/app.js?v=2" defer></script>
 </head>
 <body>
   <div id="login-view" class="login-layout">
@@ -39,7 +39,7 @@
     <main class="workspace">
       <header class="topbar"><span>MONITORAMENTO DE ACELGA</span><span class="admin-badge">Acesso administrativo</span></header>
       <section class="page-heading"><div><p class="section-label">SEU CAMPO, MAIS PERTO</p><h1>Galeria de capturas</h1><p>Observe os detalhes. Acompanhe cada registro.</p></div><button id="refresh" class="primary" type="button">↻ Atualizar</button></section>
-      <div class="notice"><span class="notice-icon" aria-hidden="true">i</span><p><strong>Acompanhamento por imagens.</strong> A análise por inteligência artificial ainda não está disponível. Estas fotos não representam um diagnóstico de pragas.</p></div>
+      <div class="notice"><span class="notice-icon" aria-hidden="true">i</span><p><strong>Detecção experimental de pulgões.</strong> Abra uma foto e selecione Analisar com IA. Revise as marcações: o modelo pode errar e ainda precisa ser avaliado em fotos reais da plantação.</p></div>
       <section class="stats" aria-label="Resumo da página">
         <article><span>Capturas nesta página</span><strong id="stat-count">—</strong><small>Até 12 imagens por página</small></article>
         <article><span>Dispositivos nesta página</span><strong id="stat-devices">—</strong><small>Câmeras que enviaram estas fotos</small></article>
@@ -57,9 +57,18 @@
   </div>
   <dialog id="image-dialog" aria-labelledby="detail-title">
     <div class="dialog-top"><div><p class="section-label">DETALHES DA CAPTURA</p><h2 id="detail-title">Imagem capturada</h2></div><button id="close-dialog" class="secondary" type="button" aria-label="Fechar imagem">Fechar ×</button></div>
-    <div class="detail-image-wrap"><img id="detail-image" alt="Captura ampliada da câmera"></div>
+    <div class="detail-image-wrap"><img id="detail-image" alt="Captura ampliada da câmera"><canvas id="analysis-canvas" aria-label="Fotografia com caixas de possíveis pulgões" hidden></canvas></div>
+    <section class="analysis-panel" aria-label="Análise por inteligência artificial">
+      <div class="analysis-actions"><button id="analyze-button" class="primary" type="button" disabled>Analisar com IA</button><label><input id="show-boxes" type="checkbox" checked disabled> Mostrar marcações</label></div>
+      <p id="analysis-message" role="status"></p>
+      <p id="analysis-error" class="error" role="alert"></p>
+      <p id="analysis-meta" class="detail-note"></p>
+      <label id="history-label" hidden>Análises salvas (até 20 mais recentes)<select id="analysis-history"></select></label>
+      <ul id="analysis-detections"></ul>
+      <p class="detail-note">As pontuações expressam a confiança do modelo, não uma garantia de acerto. A fotografia original é preservada.</p>
+    </section>
     <dl id="detail-fields"></dl>
-    <p class="detail-note">Imagem original · Sem análise por IA</p>
+    <p class="detail-note">Captura original e resultados de IA armazenados separadamente.</p>
   </dialog>
 </body>
 </html>
