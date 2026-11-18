@@ -17,8 +17,22 @@ dist/
 # Imagens, dados e modelos locais
 /data/
 /storage/
-/artifacts/models/
+/artifacts/models/*
+!/artifacts/models/praga-v2.onnx
 pending/
+
+# Dados de bancada e cópias privadas, fora do código distribuído
+backups/
+datasets/
+treinos/
+diagnosticos-centralizacao/
+*.dump
+*.sqlite
+*.sqlite3
+*.pt
+*.pem
+*.key
+/tcc-publicacao*.zip
 
 # Arquivos temporarios
 *.log

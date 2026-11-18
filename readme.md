@@ -1,233 +1,41 @@
-# Monitoramento de pragas em acelga
+# Monitoramento de pragas em acelgas — SmartFarm
 
-Projeto de TCC para monitoramento de acelgas por imagens,
-com captura pela Raspberry Pi e análise no computador.
+Protótipo de TCC para apoiar a inspeção visual de acelgas. Um robô segue uma faixa na bancada e fotografa quatro plantas na ida e na volta. São oito registros previstos por missão. Cada foto chega ao computador identificada por planta e passagem; o operador pode solicitar uma análise e consultar o histórico no navegador.
 
-## Ambiente
+**Versão da bancada:** em 18/11/2026, a API e o serviço de análise carregaram o mesmo detector, `praga-v2-regioes`, e uma análise foi registrada no banco com essa versão. A instalação do computador e o conteúdo de um clone do GitHub são coisas diferentes. A revisão anterior do repositório ([`6013662`](https://github.com/Biancacz3/tcc/tree/60136629cfcc061f94736916efe634749fbb5d0d)) tinha apenas `api` e `db` no Compose, um agente de captura simples na Raspberry e instruções da primeira versão do painel. Para reproduzir a bancada, é preciso também o código com o serviço `worker`, o programa integrado do robô e o arquivo ONNX da V2.
 
-- Docker Desktop com WSL 2.
-- Back-end: Python 3.13, FastAPI e Uvicorn.
-- Banco de dados: PostgreSQL 17.
-- Comunicação com o banco: SQLAlchemy 2 e Psycopg 3.
-- Migrações: Alembic.
-- Validação dos dados da API: Pydantic.
+## Como uma foto chega ao painel
 
-As versões das bibliotecas estão em backend/requirements.txt.
+| Etapa | O que acontece |
+| --- | --- |
+| Captura | Os sensores de linha orientam o deslocamento; os marcadores visuais ArUco identificam as plantas. A Raspberry Pi 3 Model B para e fotografa com a Camera Module 3. O programa principal da bancada é `tcc_integrado.py`. |
+| Envio | A Raspberry envia a captura por HTTP na rede Wi-Fi local, usando uma credencial própria. Se não receber confirmação do servidor, guarda a captura na fila local para reenvio. |
+| Armazenamento | A API FastAPI recebe a captura. O JPEG fica no armazenamento do servidor e o PostgreSQL guarda a identificação da planta, os registros da captura e as análises. |
+| Análise | O `worker` é o serviço que processa a fila de análises. A solução usa OpenCV para preparar regiões da imagem e ONNX Runtime para executar o detector na CPU. O modelo possui uma única categoria, **praga**, treinada com exemplos de pulgões e besouros. |
+| Consulta | O operador acessa o painel com e-mail e senha. Pode abrir a foto, visualizar as caixas de detecção e pedir uma nova análise. A credencial da Raspberry serve para enviar fotos; ela não é o login do operador. |
 
-## Preparação
+**Zero detecções** significa que o sistema não aceitou nenhuma região naquela imagem. Não prova ausência de insetos na planta. A demonstração usou plantas de bancada; as métricas do detector foram obtidas em imagens reservadas da base IP102.
 
-Na primeira configuração, crie .env a partir de .env.example.
+## Usar no computador já configurado
 
-Configure no .env:
+Abra o Docker Desktop. Se os serviços já iniciarem automaticamente, basta abrir [o painel local](http://localhost:8000/painel/). Não é necessário treinar nem exportar o modelo a cada uso.
 
-- POSTGRES_DB: nome do banco.
-- POSTGRES_USER: usuário do banco.
-- POSTGRES_PASSWORD: senha exclusiva para o banco local.
-- ADMIN_API_TOKEN: chave administrativa desta instalação.
+Para conferir o servidor, abra o PowerShell na pasta que contém os dois arquivos Compose:
 
-Para gerar a chave administrativa:
+```powershell
+docker compose -f compose.yaml -f compose.ia.yaml ps
+Invoke-RestMethod 'http://localhost:8000/api/v1/health'
+Invoke-RestMethod 'http://localhost:8000/api/v1/health/db'
+```
 
-`python -c "import secrets; print(secrets.token_urlsafe(32))"`
+Na instalação V2, espere encontrar `api`, `db` e `worker`. A primeira consulta verifica a API e a segunda verifica a conexão com o banco. Se estiverem ativos, mas houver análises pendentes, consulte `docker compose -f compose.yaml -f compose.ia.yaml logs --tail 60 worker`.
 
-Copie o resultado para ADMIN_API_TOKEN.
+Em outro computador ou celular na mesma rede, use `http://IP_DO_SERVIDOR:8000/painel/`, substituindo `IP_DO_SERVIDOR` pelo IPv4 do computador que executa o Docker. O servidor precisa aceitar conexões da rede local. Nesse outro aparelho, `localhost` apontaria para o próprio aparelho.
 
-Mantenha .env fora do Git. O arquivo .env.example contém
-somente valores de exemplo.
+## Instalar em outro computador
 
-## Executar
+Veja o [guia para outro computador](docs/instalar-servidor-v2.md) para conferir o modelo, iniciar uma instalação nova e distinguir os arquivos do projeto dos dados privados. **Para analisar fotos não é preciso instalar CUDA, ter placa NVIDIA ou baixar o IP102.** O modelo já foi treinado; o servidor utiliza seu arquivo exportado.
 
-Com o Docker Desktop aberto, execute na raiz:
+Para a preparação das imagens, treinamento, avaliação e versão dos pesos, consulte [Modelo de IA: praga V2](docs/modelo-praga-v2.md). Para identificar o programa e a configuração da placa, veja [Operação da Raspberry](docs/operacao-raspberry.md).
 
-`docker compose up --build -d --wait`
-
-Depois, aplique as migrações:
-
-`docker compose exec api alembic upgrade head`
-
-Verificação da API:
-http://localhost:8000/api/v1/health
-
-Verificação da conexão com o banco:
-http://localhost:8000/api/v1/health/db
-
-Documentação interativa:
-http://localhost:8000/docs
-
-Após alterar o código do back-end, reconstrua a imagem
-com o comando de inicialização usando --build.
-
-Para consultar os registros da API:
-
-`docker compose logs --tail=80 api`
-
-Para parar os serviços:
-
-`docker compose stop`
-
-## Migrações
-
-Os arquivos ficam em backend/alembic/versions.
-
-Migrações existentes:
-
-- 0001_devices: cria a tabela devices.
-- 0002_device_tokens: adiciona api_token_hash e sua
-  restrição de unicidade.
-
-Para consultar a versão aplicada:
-
-`docker compose exec api alembic current`
-
-Para verificar diferenças entre banco e modelos:
-
-`docker compose exec api alembic check`
-
-Mudanças futuras na estrutura terão novos arquivos de migração.
-
-## Autenticação
-
-As credenciais são enviadas no cabeçalho HTTP:
-
-`Authorization: Bearer SUA_CHAVE`
-
-No Swagger, clique em Authorize e informe somente a chave
-no campo correspondente.
-
-- AdminToken: chave administrativa do arquivo .env.
-- DeviceToken: chave individual emitida para o dispositivo.
-
-A autorização do Swagger vale para as requisições enviadas
-por ele. Abrir uma rota diretamente na barra do navegador
-não envia essa credencial.
-
-## Dispositivos
-
-As rotas ficam em backend/app/api/devices.py.
-Os esquemas ficam em backend/app/schemas/device.py.
-A autenticação fica em backend/app/security.py.
-
-Cada requisição utiliza uma sessão própria do SQLAlchemy,
-fechada ao terminar.
-
-### Cadastrar
-
-POST /api/v1/devices
-
-Exige AdminToken.
-
-Corpo de exemplo:
-
-`{"name": "Raspberry 01"}`
-
-O nome deve ter entre 1 e 100 caracteres após a remoção
-dos espaços nas bordas. Campos extras são rejeitados.
-
-Retorna HTTP 201 com id, name, is_active e created_at.
-O dispositivo é criado como ativo.
-
-Nomes podem se repetir. Cada cadastro recebe um UUID próprio.
-Com autenticação válida, dados inválidos retornam HTTP 422.
-
-### Listar
-
-GET /api/v1/devices
-
-Exige AdminToken.
-
-Retorna uma lista ordenada por created_at e id.
-
-Parâmetros opcionais:
-
-- limit: de 1 a 100. Padrão: 50.
-- offset: quantidade de registros a pular. Padrão: 0.
-
-### Emitir ou substituir uma credencial
-
-POST /api/v1/devices/{device_id}/token
-
-Exige AdminToken.
-
-Retorna HTTP 200 com device_id, token e token_type.
-
-A chave contém 32 bytes de aleatoriedade gerados com secrets.
-O banco armazena somente o hash SHA-256, em api_token_hash.
-
-A chave completa é devolvida na resposta da emissão.
-Guarde-a em local privado.
-
-Emitir outra chave substitui a anterior, que deixa de funcionar.
-Se a chave for perdida, o administrador pode emitir outra.
-
-Dispositivo inexistente retorna HTTP 404.
-Dispositivo inativo retorna HTTP 409 na emissão.
-
-### Identificar o dispositivo autenticado
-
-GET /api/v1/devices/me
-
-Exige DeviceToken.
-
-Retorna HTTP 200 com os dados do dispositivo autenticado.
-
-Credencial ausente ou inválida retorna HTTP 401.
-Dispositivos inativos também são rejeitados.
-
-A chave do dispositivo não concede acesso administrativo.
-
-## Testes das credenciais
-
-- Emissão sem chave administrativa: HTTP 401.
-- Emissão com chave administrativa válida: HTTP 200.
-- Identificação sem chave de dispositivo: HTTP 401.
-- Identificação com chave incorreta: HTTP 401.
-- Identificação com chave válida: HTTP 200.
-- Chave de dispositivo usada como administrativa: HTTP 401.
-- Após nova emissão, chave anterior: HTTP 401.
-- Após nova emissão, chave nova: HTTP 200.
-- Hash armazenado no banco: 64 caracteres.
-
-## Teste de disponibilidade do banco
-
-A rota /api/v1/health/db executa SELECT 1 no PostgreSQL.
-
-Quando funciona, retorna status ok e database connected.
-Se o banco estiver indisponível, retorna HTTP 503.
-
-Para testar a interrupção:
-
-`docker compose stop db`
-
-Para iniciar novamente:
-
-`docker compose up -d --wait db`
-
-Após iniciar o banco, a rota deve voltar a indicar connected.
-
-## Dados locais
-
-A API está publicada somente em 127.0.0.1:8000.
-
-O PostgreSQL utiliza o volume postgres_data.
-
-O GitHub sincroniza código, migrações e configurações de exemplo.
-Os dados do banco permanecem no computador onde ele executa
-e exigem backup e restauração para transferência.
-
-As chaves completas dos dispositivos devem ser guardadas
-separadamente e fora do Git. O banco contém apenas seus hashes.
-
-## Progresso
-
-- Repositório configurado no GitHub.
-- FastAPI e PostgreSQL funcionando com Docker.
-- Conexão com o banco usando SQLAlchemy.
-- Verificações de saúde da API e do banco.
-- Migrações gerenciadas com Alembic.
-- Cadastro e listagem de dispositivos.
-- Validação do nome do dispositivo.
-- Proteção administrativa das operações de gerenciamento.
-- Emissão e substituição de credenciais individuais.
-- Identificação de dispositivo por sua credencial.
-- Script inicial da Raspberry em raspberry/capture_and_send.py.
-- Recebimento de imagens, interface e IA em desenvolvimento.
-Captura de imagens: [configuracao e testes](docs/capturas.md).
+Para quem mantém esta instalação: [como trazer para o Git a cópia do notebook e da Raspberry](docs/sincronizar-bancada.md).
