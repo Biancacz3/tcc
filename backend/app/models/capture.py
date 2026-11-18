@@ -26,3 +26,10 @@ class Capture(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=text("'received'")
     )
+    # Snapshot enviado pelo robo. Capturas antigas permanecem sem identidade.
+    plant_id: Mapped[str | None] = mapped_column(String(80), index=True)
+    plant_name: Mapped[str | None] = mapped_column(String(120))
+    marker_id: Mapped[int | None] = mapped_column(Integer)
+    mission_id: Mapped[str | None] = mapped_column(String(80), index=True)
+    passage: Mapped[int | None] = mapped_column(Integer)
+    plant_side: Mapped[str | None] = mapped_column(String(40))

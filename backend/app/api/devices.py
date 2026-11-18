@@ -26,6 +26,7 @@ from app.security import (
     get_authenticated_device,
     hash_device_token,
     require_admin,
+    require_user,
 )
 
 
@@ -78,7 +79,7 @@ def create_device(
 @router.get(
     "",
     response_model=list[DeviceRead],
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_user)],
 )
 def list_devices(
     session: DatabaseSession,

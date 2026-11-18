@@ -1,26 +1,9 @@
-# Configuracoes locais
 .env
-.env.*
-!.env.example
-
-# Python
-.venv/
-venv/
+storage/
+artifacts/
+backups/
 __pycache__/
-*.py[cod]
+*.pyc
 .pytest_cache/
 
-# Front-end
-node_modules/
-dist/
-
-# Imagens, dados e modelos locais
-/data/
-/storage/
-/artifacts/models/
-pending/
-
-# Arquivos temporarios
-*.log
-Thumbs.db
-.DS_Store
+.env.raspberry

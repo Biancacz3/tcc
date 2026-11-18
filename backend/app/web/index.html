@@ -6,10 +6,11 @@
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>Acelga · Monitoramento</title>
-  <link rel="stylesheet" href="/painel/styles.css?v=2">
-  <script src="/painel/app.js?v=2" defer></script>
+  <link rel="stylesheet" href="/painel/styles.css?v=4">
+  <script src="/painel/app.js?v=4" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Ir para o conteúdo</a>
   <div id="login-view" class="login-layout">
     <section class="welcome">
       <div class="brand"><span class="brand-icon" aria-hidden="true">↗</span> acelga<span class="brand-dot">.</span></div>
@@ -19,12 +20,13 @@
     <main class="login-main">
       <form id="login-form" class="login-form">
         <span class="section-label">ACESSO AO PAINEL</span><h2>Bem-vinda ao campo.</h2><p>Entre para acompanhar suas capturas.</p>
-        <label for="admin-key">Chave administrativa</label>
-        <input id="admin-key" type="password" required autocomplete="off" spellcheck="false" placeholder="Cole sua chave de acesso">
-        <p class="field-hint">Use o valor de ADMIN_API_TOKEN do arquivo .env do computador.</p>
+        <label for="login-email">E-mail</label>
+        <input id="login-email" type="email" required autocomplete="username" maxlength="254" placeholder="voce@exemplo.com">
+        <label for="login-password">Senha</label>
+        <input id="login-password" type="password" required autocomplete="current-password" maxlength="128" placeholder="Sua senha">
         <button id="login-button" class="primary" type="submit">Entrar no painel <span aria-hidden="true">→</span></button>
         <p id="login-error" class="error" role="alert"></p>
-        <p class="privacy-note">A chave fica apenas na memória desta página. Ao sair ou recarregar, você precisará entrar novamente.</p>
+        <p class="privacy-note">Sua sessão permanece ativa neste navegador por até 7 dias. Use “Sair do painel” ao terminar em um computador compartilhado.</p>
       </form>
     </main>
   </div>
@@ -32,43 +34,125 @@
     <aside class="sidebar">
       <div class="brand"><span class="brand-icon" aria-hidden="true">↗</span> acelga<span class="brand-dot">.</span></div>
       <p class="sidebar-label">ACOMPANHAMENTO</p>
-      <div class="nav-active"><span aria-hidden="true">▦</span> Capturas</div>
+      <nav class="main-nav" aria-label="Seções do painel">
+        <button id="nav-captures" class="nav-button nav-active" type="button" aria-current="page"><span aria-hidden="true">▦</span> Capturas</button>
+        <button id="nav-positive" class="nav-button" type="button"><span aria-hidden="true">⌕</span> Plantas Contaminadas</button>
+        <button id="nav-devices" class="nav-button" type="button"><span aria-hidden="true">◉</span> Câmeras</button>
+        <button id="nav-users" class="nav-button" type="button" hidden><span aria-hidden="true">♧</span> Usuários</button>
+        <button id="nav-account" class="nav-button" type="button"><span aria-hidden="true">○</span> Minha conta</button>
+      </nav>
       <div class="sidebar-note"><span class="live-dot"></span><strong>Do campo para a tela</strong><p>Fotos enviadas pelas suas câmeras e armazenadas no computador.</p></div>
       <button id="logout" class="logout" type="button">Sair do painel <span aria-hidden="true">↗</span></button>
     </aside>
-    <main class="workspace">
-      <header class="topbar"><span>MONITORAMENTO DE ACELGA</span><span class="admin-badge">Acesso administrativo</span></header>
-      <section class="page-heading"><div><p class="section-label">SEU CAMPO, MAIS PERTO</p><h1>Galeria de capturas</h1><p>Observe os detalhes. Acompanhe cada registro.</p></div><button id="refresh" class="primary" type="button">↻ Atualizar</button></section>
-      <div class="notice"><span class="notice-icon" aria-hidden="true">i</span><p><strong>Detecção experimental de pulgões.</strong> Abra uma foto e selecione Analisar com IA. Revise as marcações: o modelo pode errar e ainda precisa ser avaliado em fotos reais da plantação.</p></div>
-      <section class="stats" aria-label="Resumo da página">
-        <article><span>Capturas nesta página</span><strong id="stat-count">—</strong><small>Até 12 imagens por página</small></article>
-        <article><span>Dispositivos nesta página</span><strong id="stat-devices">—</strong><small>Câmeras que enviaram estas fotos</small></article>
-        <article><span>Recebimento mais recente da página</span><strong id="stat-received" class="date-stat">—</strong><small id="stat-received-date">Horário deste navegador</small></article>
+    <main id="main-content" class="workspace" tabindex="-1">
+      <header class="topbar"><span>MONITORAMENTO DE ACELGA</span><span id="connection-status" class="connection-status" role="status">Conectando…</span><span id="session-name" class="admin-badge">Sessão ativa</span></header>
+      <div id="captures-view">
+      <section class="page-heading"><div><p class="section-label">SEU CAMPO, MAIS PERTO</p><h1>Galeria de capturas</h1><p>Observe os detalhes. Acompanhe cada registro.</p></div><div class="heading-actions"><button id="refresh" class="secondary" type="button">↻ Atualizar</button><button id="open-upload" class="primary" type="button" hidden>+ Enviar foto</button></div></section>
+      <div class="notice"><span class="notice-icon" aria-hidden="true">i</span><p><strong>Análise automática das novas fotos.</strong> Envie uma imagem ou aguarde a câmera. O resultado aparece aqui quando estiver pronto. Resultado automático; confira a imagem.</p></div>
+      <section class="stats" aria-label="Resumo de todas as capturas">
+        <article><span>Total de capturas</span><strong id="stat-count">—</strong><small>Todo o histórico</small></article>
+        <article><span>Com bicho detectado</span><strong id="stat-positive">—</strong><small>Resultado mais recente por foto</small></article>
+        <article><span>Para conferir</span><strong id="stat-review">—</strong><small>Regiões não identificadas ou inconclusivas</small></article>
+        <article><span>Aguardando análise</span><strong id="stat-queued">—</strong><small id="stat-failed">Atualização automática</small></article>
       </section>
+      <p class="summary-line"><span id="stat-devices">—</span> câmeras cadastradas <span aria-hidden="true">·</span> Último recebimento: <span id="stat-received">—</span> <span id="stat-received-date"></span></p>
       <section class="gallery-section" aria-label="Imagens capturadas">
         <div class="gallery-toolbar"><div><h2>Registros do campo</h2><p id="updated" aria-live="polite">Aguardando carregamento</p></div><label class="auto-label"><input id="auto-refresh" type="checkbox" checked> Atualizar a cada 30 s</label></div>
+        <form id="capture-filters" class="history-filters capture-filters">
+          <label>Status<select id="capture-state"><option value="">Todos os resultados</option value="positive">Praga detectada</option><option value="review">Para conferir</option><option value="no_detections">Nenhuma detecção</option><option value="inconclusive">Imagem inconclusiva</option><option value="pending">Aguardando análise</option><option value="failed">Falha na análise</option></select></label>
+          <label>Identificador da planta<input id="capture-plant" maxlength="80" placeholder="Todas as plantas"></label>
+          <label>De<input id="capture-from" type="date"></label><label>Até<input id="capture-to" type="date"></label>
+          <button class="primary" type="submit">Filtrar</button><button id="capture-clear" class="secondary" type="button">Limpar</button>
+        </form>
+        <p class="filter-note">Período pela data da captura, no horário de São Paulo.</p>
         <p id="page-error" class="error page-error" role="alert" hidden></p>
-        <div id="empty-state" class="empty-state" hidden><span aria-hidden="true">▧</span><h3>Nenhuma captura por aqui</h3><p>As imagens aparecerão quando uma câmera enviar fotos ao sistema.</p></div>
+        <div id="empty-state" class="empty-state" hidden><span aria-hidden="true">▧</span><h3>Nenhuma captura por aqui</h3><p>Envie uma foto ou aguarde uma câmera. Se houver filtros, tente limpá-los.</p></div>
         <div id="gallery" class="gallery" aria-busy="false"></div>
         <footer class="pagination"><span id="page-number">Página 1</span><div><button id="previous" class="secondary" type="button" disabled>← Anterior</button><button id="next" class="secondary" type="button" disabled>Próxima →</button></div></footer>
         <p class="footnote">Ordenação pelo recebimento, das mais recentes às mais antigas. Os horários seguem o fuso deste navegador.</p>
+      </section>
+      </div>
+      <section id="positive-view" hidden aria-labelledby="positive-title">
+        <div class="page-heading"><div><p class="section-label">HISTÓRICO DE DETECÇÕES</p><h1 id="positive-title">Plantas Contaminadas</h1><p>Consulte as imagens que tiveram detecção positiva.</p></div><button id="positive-refresh" class="primary" type="button">↻ Atualizar</button></div>
+        <div class="notice"><span class="notice-icon" aria-hidden="true">i</span><p><strong>Resultado automático; confira a imagem.</strong> Esta consulta preserva as detecções positivas anteriores, mesmo após uma nova análise. Regiões não identificadas não entram nesta lista.</p></div>
+        <form id="positive-filters" class="history-filters">
+          <label>Identificador da planta<input id="filter-plant" type="text" maxlength="80" placeholder="Todas as plantas"></label>
+          <label>De<input id="filter-from" type="date"></label>
+          <label>Até<input id="filter-to" type="date"></label>
+          <button class="primary" type="submit">Filtrar</button><button id="clear-filters" class="secondary" type="button">Limpar</button>
+        </form>
+        <p class="footnote">O período considera a data de captura no horário de São Paulo. Os horários dos registros seguem o fuso deste navegador.</p>
+        <p id="positive-error" class="error page-error" role="alert" hidden></p>
+        <p id="positive-summary" class="history-summary" aria-live="polite">Aguardando carregamento</p>
+        <div id="positive-empty" class="empty-state" hidden><h3>Nenhuma detecção positiva neste filtro</h3><p>Isso não confirma ausência de insetos. Fotos ainda na fila ou sem detecção não aparecem nesta lista.</p></div>
+        <div id="positive-table-wrap" class="table-wrap"><table class="positive-table"><caption class="sr-only">Histórico de imagens com detecção positiva</caption><thead><tr><th scope="col">Planta</th><th scope="col">Data da captura</th><th scope="col">Status</th><th scope="col">Foto</th></tr></thead><tbody id="positive-body"></tbody></table></div>
+        <footer class="pagination"><span id="positive-page-number">Página 1</span><div><button id="positive-previous" class="secondary" type="button" disabled>← Anterior</button><button id="positive-next" class="secondary" type="button" disabled>Próxima →</button></div></footer>
+      </section>
+      <section id="devices-view" hidden aria-labelledby="devices-title">
+        <div class="page-heading"><div><p class="section-label">ORIGEM DAS IMAGENS</p><h1 id="devices-title">Câmeras</h1><p>Dispositivos cadastrados para enviar capturas.</p></div><button id="devices-refresh" class="secondary" type="button">↻ Atualizar</button></div>
+        <p id="devices-error" class="error page-error" role="alert" hidden></p><div id="devices-list" class="device-grid"></div>
+        <p class="detail-note">O cadastro informa a autorização para envio. Ele não confirma se a câmera está ligada neste momento.</p>
+      </section>
+      <section id="users-view" hidden aria-labelledby="users-title">
+        <div class="page-heading"><div><p class="section-label">CONTROLE DE ACESSO</p><h1 id="users-title">Usuários</h1><p>Escolha quem pode consultar e administrar o painel.</p></div><button id="create-user" class="primary" type="button">+ Novo usuário</button></div>
+        <p id="users-error" class="error page-error" role="alert" hidden></p><p id="users-notice" class="success-message" role="status"></p>
+        <div class="table-wrap"><table class="positive-table"><caption class="sr-only">Usuários cadastrados</caption><thead><tr><th scope="col">Usuário</th><th scope="col">Acesso</th><th scope="col">Situação</th><th scope="col">Ação</th></tr></thead><tbody id="users-body"></tbody></table></div>
+        <footer class="pagination"><span id="users-page">Página 1</span><div><button id="users-previous" class="secondary" type="button">← Anterior</button><button id="users-next" class="secondary" type="button">Próxima →</button></div></footer>
+      </section>
+      <section id="account-view" hidden aria-labelledby="account-title">
+        <div class="page-heading"><div><p class="section-label">SEU ACESSO</p><h1 id="account-title">Minha conta</h1><p id="account-email"></p></div></div>
+        <form id="password-form" class="form-panel"><h2>Alterar minha senha</h2><p class="detail-note">Ao salvar, entre novamente com a nova senha em todos os seus dispositivos.</p>
+          <label for="current-password">Senha atual</label><input id="current-password" type="password" required autocomplete="current-password" maxlength="128">
+          <label for="new-password">Nova senha</label><input id="new-password" type="password" required minlength="12" maxlength="128" autocomplete="new-password"><small>Use de 12 a 128 caracteres.</small>
+          <label for="confirm-password">Confirmar nova senha</label><input id="confirm-password" type="password" required minlength="12" maxlength="128" autocomplete="new-password">
+          <p id="password-error" class="error" role="alert"></p><button id="password-submit" class="primary" type="submit">Salvar nova senha</button>
+        </form>
       </section>
     </main>
   </div>
   <dialog id="image-dialog" aria-labelledby="detail-title">
     <div class="dialog-top"><div><p class="section-label">DETALHES DA CAPTURA</p><h2 id="detail-title">Imagem capturada</h2></div><button id="close-dialog" class="secondary" type="button" aria-label="Fechar imagem">Fechar ×</button></div>
-    <div class="detail-image-wrap"><img id="detail-image" alt="Captura ampliada da câmera"><canvas id="analysis-canvas" aria-label="Fotografia com caixas de possíveis pulgões" hidden></canvas></div>
+    <div class="detail-image-wrap"><img id="detail-image" alt="Captura ampliada da câmera"><canvas id="analysis-canvas" role="img" aria-label="Fotografia com marcações verdes para bichos detectados e amarelas para regiões não identificadas" hidden></canvas></div>
     <section class="analysis-panel" aria-label="Análise por inteligência artificial">
-      <div class="analysis-actions"><button id="analyze-button" class="primary" type="button" disabled>Analisar com IA</button><label><input id="show-boxes" type="checkbox" checked disabled> Mostrar marcações</label></div>
+      <div class="analysis-actions"><button id="reanalyze-button" class="secondary" type="button" hidden>Fazer nova análise</button><button id="analyze-button" class="secondary" type="button" hidden disabled>Tentar análise novamente</button><label><input id="show-boxes" type="checkbox" checked disabled> Mostrar marcações</label><label><input id="show-candidates" type="checkbox" checked> Mostrar regiões não identificadas</label></div>
+      <div id="analysis-legend" class="analysis-legend" hidden><span><i class="legend-positive" aria-hidden="true"></i> Praga detectada</span><span><i class="legend-review" aria-hidden="true"></i> Região não identificada</span></div>
+      <p id="analysis-progress" class="analysis-progress" role="status"></p>
       <p id="analysis-message" role="status"></p>
       <p id="analysis-error" class="error" role="alert"></p>
       <p id="analysis-meta" class="detail-note"></p>
       <label id="history-label" hidden>Análises salvas (até 20 mais recentes)<select id="analysis-history"></select></label>
-      <ul id="analysis-detections"></ul>
-      <p class="detail-note">As pontuações expressam a confiança do modelo, não uma garantia de acerto. A fotografia original é preservada.</p>
+      <p id="analysis-warnings" class="detail-note"></p>
+      <p class="detail-note">Resultado automático; confira a imagem. Uma região não identificada não confirma a presença de inseto.</p>
+      <details class="technical-details"><summary>Informações da análise</summary><ul id="analysis-detections"></ul><p>O reconhecimento depende do padrão aprendido pelo modelo. A presença de outros insetos pode passar despercebida.</p></details>
     </section>
-    <dl id="detail-fields"></dl>
-    <p class="detail-note">Captura original e resultados de IA armazenados separadamente.</p>
+    <details class="capture-details"><summary>Informações da captura</summary><dl id="detail-fields"></dl></details>
+    <p class="detail-note">A fotografia original é preservada.</p>
+  </dialog>
+  <dialog id="upload-dialog" class="small-dialog" aria-labelledby="upload-title">
+    <div class="dialog-top"><div><p class="section-label">NOVA CAPTURA</p><h2 id="upload-title">Enviar foto</h2></div><button id="close-upload" class="secondary" type="button" aria-label="Fechar envio">Fechar ×</button></div>
+    <form id="upload-form" class="stack-form">
+      <p>A análise começa automaticamente após o envio. Use a foto original, com a planta visível.</p>
+      <label for="upload-file">Fotografia JPEG</label><input id="upload-file" type="file" accept="image/jpeg,.jpg,.jpeg" required>
+      <label for="upload-plant">Identificador da planta <span class="optional">opcional</span></label><input id="upload-plant" maxlength="80" placeholder="Ex.: acelga-01">
+      <label for="upload-name">Nome da planta <span class="optional">opcional</span></label><input id="upload-name" maxlength="120" placeholder="Ex.: Acelga 01">
+      <p id="upload-message" class="detail-note" role="status"></p><p id="upload-error" class="error" role="alert"></p>
+      <button id="upload-submit" class="primary" type="submit">Enviar e analisar automaticamente</button>
+    </form>
+  </dialog>
+  <dialog id="user-dialog" class="small-dialog" aria-labelledby="user-title">
+    <div class="dialog-top"><h2 id="user-title">Novo usuário</h2><button id="close-user" class="secondary" type="button">Fechar ×</button></div>
+    <form id="user-form" class="stack-form">
+      <label for="user-name">Nome</label><input id="user-name" required maxlength="100" autocomplete="name">
+      <label for="user-email">E-mail</label><input id="user-email" type="email" required maxlength="254" autocomplete="off">
+      <label for="user-role">Permissão</label><select id="user-role"><option value="viewer">Consulta · visualizar capturas e resultados</option><option value="admin">Administrador · gerenciar fotos e usuários</option></select>
+      <label id="user-active-label" class="check-label" hidden><input id="user-active" type="checkbox"> Conta ativa</label>
+      <label id="user-password-label" for="user-password">Senha inicial</label><input id="user-password" type="password" minlength="12" maxlength="128" autocomplete="new-password"><small id="user-password-hint">De 12 a 128 caracteres. Compartilhe a senha diretamente com a pessoa.</small>
+      <p id="user-error" class="error" role="alert"></p><button id="user-submit" class="primary" type="submit">Criar usuário</button>
+    </form>
+  </dialog>
+  <dialog id="reset-dialog" class="small-dialog" aria-labelledby="reset-title">
+    <div class="dialog-top"><h2 id="reset-title">Redefinir senha</h2><button id="close-reset" class="secondary" type="button">Fechar ×</button></div>
+    <form id="reset-form" class="stack-form"><p id="reset-user-name"></p><p class="detail-note">As sessões desta pessoa serão encerradas. Compartilhe a nova senha diretamente com ela.</p><label for="reset-password">Nova senha</label><input id="reset-password" type="password" minlength="12" maxlength="128" required autocomplete="new-password"><p id="reset-error" class="error" role="alert"></p><button id="reset-submit" class="primary" type="submit">Redefinir senha</button></form>
   </dialog>
 </body>
 </html>

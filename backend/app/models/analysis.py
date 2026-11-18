@@ -25,4 +25,17 @@ class Analysis(Base):
     height: Mapped[int] = mapped_column(Integer)
     detection_count: Mapped[int] = mapped_column(Integer)
     detections: Mapped[list] = mapped_column(JSON)
+    # Legacy analyses are retained as historical model outputs, not relabelled
+    # as region-based analyses during the schema migration.
+    analysis_state: Mapped[str] = mapped_column(String(24), nullable=False,
+        default="legacy", server_default=text("'legacy'"))
+    candidates: Mapped[list] = mapped_column(JSON, nullable=False,
+        default=list, server_default=text("'[]'"))
+    unidentified_count: Mapped[int] = mapped_column(Integer, nullable=False,
+        default=0, server_default=text("0"))
+    warnings: Mapped[list] = mapped_column(JSON, nullable=False,
+        default=list, server_default=text("'[]'"))
+    method: Mapped[str] = mapped_column(String(100), nullable=False,
+        default="legacy_full_image", server_default=text("'legacy_full_image'"))
+    plant_bbox: Mapped[list | None] = mapped_column(JSON, nullable=True)
 

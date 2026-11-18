@@ -1,31 +1,29 @@
-import hashlib
 import logging
-import time
-from io import BytesIO
 from typing import Annotated
 from uuid import UUID
 
-import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from PIL import Image
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.captures import STORAGE_DIR, MAX_BYTES, MAX_PIXELS
+from app.api.captures import STORAGE_DIR
+from app.analysis_service import AnalysisFailure, analyze_capture
 from app.db.session import get_session
-from app.inference import CONFIDENCE, IOU, MODEL_NAME, analysis_lock, get_detector
+from app.inference import analysis_lock, get_detector
+from app.jobs import complete
 from app.models.analysis import Analysis
+from app.models.analysis_job import AnalysisJob
 from app.models.capture import Capture
 from app.schemas.analysis import AnalysisRead
-from app.security import require_admin
+from app.security import require_admin, require_user
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/captures", tags=["Analises"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/captures", tags=["Analises"])
 DatabaseSession = Annotated[Session, Depends(get_session)]
 
 
-@router.get("/{capture_id}/analyses", response_model=list[AnalysisRead])
+@router.get("/{capture_id}/analyses", response_model=list[AnalysisRead], dependencies=[Depends(require_user)])
 def list_analyses(capture_id: UUID, session: DatabaseSession,
                   limit: Annotated[int, Query(ge=1, le=100)] = 20):
     try:
@@ -38,64 +36,32 @@ def list_analyses(capture_id: UUID, session: DatabaseSession,
         raise HTTPException(503, "Banco de dados indisponivel.") from None
 
 
-@router.post("/{capture_id}/analyses", response_model=AnalysisRead, status_code=201)
+@router.post("/{capture_id}/analyses", response_model=AnalysisRead, status_code=201,
+             dependencies=[Depends(require_admin)])
 def analyze(capture_id: UUID, session: DatabaseSession, response: Response):
+    # Endpoint legado permanece disponivel; upload novo usa fila automaticamente.
     if not analysis_lock.acquire(blocking=False):
-        raise HTTPException(503, "Uma analise esta em andamento. Aguarde e tente novamente.", headers={"Retry-After": "3"})
+        raise HTTPException(503, "Uma analise esta em andamento. Aguarde.", headers={"Retry-After": "3"})
     try:
-        capture = session.get(Capture, capture_id)
-        if capture is None:
+        if session.get(Capture, capture_id) is None:
             raise HTTPException(404, "Captura nao encontrada.")
         try:
             detector = get_detector()
         except Exception:
             logger.exception("Modelo de IA indisponivel.")
-            raise HTTPException(503, "Modelo de IA indisponivel. Confira a instalacao do arquivo ONNX e reinicie a API.") from None
-        statement = select(Analysis).where(Analysis.capture_id == capture_id,
-                                           Analysis.configuration_sha256 == detector.configuration_sha256)
-        existing = session.scalar(statement)
-        if existing is not None:
-            response.status_code = 200
-            return AnalysisRead.model_validate(existing)
-        path = (STORAGE_DIR / capture.storage_key).resolve()
-        if not path.is_relative_to(STORAGE_DIR.resolve()):
-            raise HTTPException(503, "Caminho da imagem invalido.")
-        started = time.perf_counter()
-        try:
-            with path.open("rb") as file:
-                data = file.read(MAX_BYTES + 1)
-            if len(data) > MAX_BYTES or hashlib.sha256(data).hexdigest() != capture.sha256:
-                raise ValueError("Integridade da imagem divergente")
-            with Image.open(BytesIO(data), formats=["JPEG"]) as image:
-                if image.size != (capture.width, capture.height) or image.width * image.height > MAX_PIXELS:
-                    raise ValueError("Dimensoes divergentes")
-                if image.getexif().get(274, 1) != 1:
-                    raise HTTPException(422, "Esta foto possui rotacao EXIF. Normalize a orientacao antes de enviar uma nova captura.")
-                rgb = np.array(image.convert("RGB"))
-            boxes = detector.predict(rgb)
-        except HTTPException:
-            raise
-        except Exception:
-            logger.exception("Falha ao analisar captura %s.", capture_id)
-            raise HTTPException(503, "Nao foi possivel analisar esta imagem. Confira o arquivo e os logs da API.") from None
-        row = Analysis(capture_id=capture_id, model_name=MODEL_NAME, model_sha256=detector.sha256,
-                       configuration_sha256=detector.configuration_sha256, image_sha256=capture.sha256,
-                       confidence_threshold=CONFIDENCE, iou_threshold=IOU,
-                       processing_ms=round((time.perf_counter()-started)*1000),
-                       width=capture.width, height=capture.height, detection_count=len(boxes), detections=boxes)
-        session.add(row)
-        try:
-            session.flush()
-        except IntegrityError:
-            session.rollback()
-            existing = session.scalar(statement)
-            if existing is None:
-                raise
-            response.status_code = 200
-            return AnalysisRead.model_validate(existing)
+            raise HTTPException(503, "Modelo de IA indisponivel. Confira o ONNX e reinicie a API.") from None
+        row, created = analyze_capture(session, capture_id, detector, STORAGE_DIR)
+        job = session.scalar(select(AnalysisJob).where(AnalysisJob.capture_id == capture_id).with_for_update())
+        if job is not None and job.status != "processing":
+            complete(job, row.id)
         result = AnalysisRead.model_validate(row)
         session.commit()
+        response.status_code = 201 if created else 200
         return result
+    except AnalysisFailure as error:
+        session.rollback()
+        logger.warning("Falha na analise %s: %s", capture_id, error)
+        raise HTTPException(error.status_code, str(error)) from None
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Falha ao persistir analise.")

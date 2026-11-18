@@ -1,17 +1,20 @@
 services:
   api:
+    restart: unless-stopped
     build:
       context: ./backend
     ports:
-      - "127.0.0.1:8000:8000"
+      - "${API_BIND_ADDRESS:-0.0.0.0}:8000:8000"
     environment:
       DB_HOST: db
       DB_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB no arquivo .env}
       POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
-      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Defina ADMIN_API_TOKEN no arquivo .env}
       STORAGE_DIR: /app/storage
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_DAYS: ${SESSION_DAYS:-7}
+      APP_ORIGIN: ${APP_ORIGIN:-}
     volumes:
       - ./storage:/app/storage
     depends_on:
@@ -20,6 +23,7 @@ services:
 
   db:
     image: postgres:17
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB no arquivo .env}
       POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env}

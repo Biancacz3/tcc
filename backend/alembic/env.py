@@ -4,6 +4,7 @@ from alembic import context
 
 from app.db.engine import database_url, engine
 from app.models import Base
+from app.migration_defaults import compare_server_default
 
 
 logging.basicConfig(
@@ -21,7 +22,7 @@ if context.is_offline_mode():
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
-        compare_server_default=True,
+        compare_server_default=compare_server_default,
     )
 
     with context.begin_transaction():
@@ -32,7 +33,7 @@ else:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
-            compare_server_default=True,
+            compare_server_default=compare_server_default,
         )
 
         with context.begin_transaction():
